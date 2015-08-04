@@ -17,14 +17,9 @@ courses_files = {}
 
 course_links_types = ("/webapps/blackboard/content/listContent.jsp")
 
-class FileStatus(Enum):
-        new = 1
-        changed = 2
-        downloaded = 3
-
-        def describe(self):
-                return self.name
-        
+NEW=1
+CHANGED=2
+DOWNLOADED=3   
 
 def ensure_dir(d):
     if not os.path.exists(d):
@@ -33,7 +28,11 @@ def ensure_dir(d):
 class BlackBoard:
     def __init__(self, username, password):
         self.session = requests.Session()
-        self.files = {}
+        try:
+            with open("cache.json", "r") as f:
+                self.files = json.load(f)
+        except:
+            self.files = {}
         self.courses = []
         self.login(username, password)
         
@@ -92,7 +91,7 @@ class BlackBoard:
         file['url'] = request.url
         file['last-modified'] = request.headers.get('last-modified')
         file['filename'] = urllib.parse.unquote(urlsplit(request.url).path.split("/")[-1])
-        file['status'] = FileStatus.new
+        file['status'] = NEW
         return id, file
             
     def parsePage(self, url):
@@ -118,8 +117,8 @@ class BlackBoard:
                     self.files[id] = info
                 elif self.files[id]['last-modified'] != info['last-modified']:
                     self.files[id] = info
-                    self.files[id]['status'] = FileStatus.changed   
-                print("\t\t[ " + self.files[id]['status'].describe() + " ] " + self.files[id]['filename'])
+                    self.files[id]['status'] = CHANGED 
+                print("\t\t[ " + str(self.files[id]['status']) + " ] " + self.files[id]['filename'])
             elif url.startswith(course_links_types):
                 if url not in self.course_links:
                     self.course_links[url] = False
@@ -145,21 +144,26 @@ class BlackBoard:
     def downloadFiles(self):
         print("Downloading files")
         for id, file in self.files.items():
-            if file['status'] == FileStatus.new:
+            if file['status'] == NEW:
+                self.downloadFile(file)
+            if file['status'] == CHANGED:
                 self.downloadFile(file)
     
     def downloadFile(self,file):
        ensure_dir(basefolder + "\\" + file['folder'])
-       print("")
        print(file['folder'] + "\\" + file['filename'])
        r = self.session.get(file['url'], stream=True)
        with open(basefolder + "\\" + file['folder'] + "\\" + file['filename'], 'wb') as f:
            for chunk in r.iter_content(chunk_size=1024):
-               print('.',end='')
                if chunk: # filter out keep-alive new chunks
                    f.write(chunk)
                    f.flush()
-        
+       file['status'] = DOWNLOADED
+       self.saveCache()
+
+    def saveCache(self):
+        with open("cache.json", "w") as f:
+            json.dump(self.files, f)
 
 
 def getUserinfo():
@@ -178,5 +182,7 @@ def getUserinfo():
 config = getUserinfo()
 bb = BlackBoard(config['username'], config['password'])
 bb.getCourses()
-bb.parseCourse("_33462_1")
+for course in bb.courses:
+    bb.parseCourse(course['id'])
 bb.downloadFiles()
+
