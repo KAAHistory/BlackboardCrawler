@@ -7,9 +7,6 @@ import os
 import json
 import hashlib
 import os.path
-from enum import Enum
-
-
 
 basefolder = "BlackBoard"
 config_file = "config.json"
@@ -77,6 +74,7 @@ class BlackBoard:
         if len(root.xpath('//*[@id="breadcrumbs"]/*[@role="navigation"]/ol/li/text()')) > 0:
             folders.append(root.xpath('//*[@id="breadcrumbs"]/*[@role="navigation"]/ol/li/text()')[-1])
         folders = [x.strip() for x in folders]
+        folders = [re.sub('[^\w\[\]_\-\(\)\#\!\&\ ]*', '', x) for x in folders]
         #for folder in folders:
         #    if folder not in page_folder:
         #        page_folder[folder] = {} 
@@ -150,6 +148,8 @@ class BlackBoard:
                 self.downloadFile(file)
     
     def downloadFile(self,file):
+       if file['filename'] == "":
+           return
        ensure_dir(basefolder + "\\" + file['folder'])
        print(file['folder'] + "\\" + file['filename'])
        r = self.session.get(file['url'], stream=True)
@@ -184,5 +184,5 @@ bb = BlackBoard(config['username'], config['password'])
 bb.getCourses()
 for course in bb.courses:
     bb.parseCourse(course['id'])
-bb.downloadFiles()
+    bb.downloadFiles()
 
