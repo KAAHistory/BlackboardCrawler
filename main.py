@@ -109,7 +109,16 @@ class BlackBoard:
         for link in content:
             url = link.get("href")
             if url.startswith('/bbcswebdav/'):
-                (id, info) = self.getFileinfo("https://bb.au.dk" + link.get("href"))
+                (id, info) = self.getFileinfo("https://bb.au.dk" + url)
+                info['folder'] = folder
+                if id not in self.files:
+                    self.files[id] = info
+                elif self.files[id]['last-modified'] != info['last-modified']:
+                    self.files[id] = info
+                    self.files[id]['status'] = CHANGED 
+                print("\t\t[ " + str(self.files[id]['status']) + " ] " + self.files[id]['filename'])
+            elif url.startswith('https://blackboard.au.dk/bbcswebdav'):
+                (id, info) = self.getFileinfo(url)
                 info['folder'] = folder
                 if id not in self.files:
                     self.files[id] = info
