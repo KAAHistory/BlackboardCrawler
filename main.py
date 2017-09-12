@@ -12,7 +12,7 @@ basefolder = "BlackBoard"
 config_file = "config.json"
 courses_files = {}
 
-course_links_types = ("/webapps/blackboard/content/listContent.jsp")
+course_links_types = ("/webapps/blackboard/content/listContent.jsp", "/webapps/blackboard/execute/content/blankPage")
 
 NEW=1
 CHANGED=2
@@ -58,6 +58,7 @@ class BlackBoard:
     def getCourses(self):
         print("Getting courses")
         root = self.getRoot("https://bb.au.dk/webapps/portal/execute/tabs/tabAction?action=refreshAjaxModule&modId=_22_1&tabId=_2_1&tab_tab_group_id=_2_1")
+        
         course_titles = root.xpath("//div[1]/ul/li/a/text()")
         course_urls = root.xpath("//div[1]/ul/li/a/@href")
         course_ids = [re.search("&id=([^&]+)", url).group(1) for url in course_urls]
@@ -105,6 +106,31 @@ class BlackBoard:
                 if url not in self.course_links:
                     self.course_links[url] = False
 
+        content = root.xpath('//*[@class="vtbegenerated"]//a')
+        for link in content:
+            url = link.get("href")
+            if url.startswith('/bbcswebdav/'):
+                (id, info) = self.getFileinfo("https://bb.au.dk" + url)
+                info['folder'] = folder
+                if id not in self.files:
+                    self.files[id] = info
+                elif self.files[id]['last-modified'] != info['last-modified']:
+                    self.files[id] = info
+                    self.files[id]['status'] = CHANGED 
+                print("\t\t[ " + str(self.files[id]['status']) + " ] " + self.files[id]['filename'])
+            elif url.startswith('https://blackboard.au.dk/bbcswebdav'):
+                (id, info) = self.getFileinfo(url)
+                info['folder'] = folder
+                if id not in self.files:
+                    self.files[id] = info
+                elif self.files[id]['last-modified'] != info['last-modified']:
+                    self.files[id] = info
+                    self.files[id]['status'] = CHANGED 
+                print("\t\t[ " + str(self.files[id]['status']) + " ] " + self.files[id]['filename'])
+            elif url.startswith(course_links_types):
+                if url not in self.course_links:
+                    self.course_links[url] = False
+                    
         content = root.xpath('//*[@id="content_listContainer"]//li//a')
         for link in content:
             url = link.get("href")
